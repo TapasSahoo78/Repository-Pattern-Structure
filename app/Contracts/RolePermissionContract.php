@@ -11,4 +11,5 @@ interface RolePermissionContract
     public function editRole($id);
     public function updateRole($request, $id);
     public function deleteRole($id);
+    public function getAdminRole();
 }

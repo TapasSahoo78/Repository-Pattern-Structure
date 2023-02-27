@@ -6,7 +6,6 @@ use App\Repositories\BaseRepository;
 use App\Contracts\RolePermissionContract;
 use App\Models\Permission;
 use App\Models\Role;
-use Exception;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -63,35 +62,29 @@ class RolePermissionRepository extends BaseRepository implements RolePermissionC
      */
     public function storeRole($attributes)
     {
-        DB::beginTransaction();
-        try {
-            $collection = collect($attributes);
+        $collection = collect($attributes);
 
-            $role =  $this->roleModel->create([
-                'name' => $collection['name'],
-                'slug' => Str::slug($collection['name']),
-            ]);
+        $role =  $this->roleModel->create([
+            'name' => $collection['name'],
+            'slug' => Str::slug($collection['name']),
+        ]);
 
-            $role_id = $role->id;
+        /** Get Last Insert Id **/
+        $role_id = $role->id;
 
-            foreach ($collection['permissions'] as $key => $value) {
-                $role_permission = DB::table('roles_permissions')->insert(
-                    [
-                        'role_id' => $role_id,
-                        'permission_id' => $value
-                    ]
-                );
-            }
+        foreach ($collection['permissions'] as $key => $value) {
+            $role_permission = DB::table('roles_permissions')->insert(
+                [
+                    'role_id' => $role_id,
+                    'permission_id' => $value
+                ]
+            );
+        }
 
-            if (isset($role_permission) && !empty($role_permission)) {
-                DB::commit();
-                return true;
-            } else {
-                return false;
-            }
-        } catch (Exception $e) {
-            DB::rollBack();
-            logger($e->getCode() . '->' . $e->getLine() . '->' . $e->getMessage());
+        if (isset($role_permission) && !empty($role_permission)) {
+            return true;
+        } else {
+            return false;
         }
     }
     /**
@@ -110,38 +103,31 @@ class RolePermissionRepository extends BaseRepository implements RolePermissionC
      */
     public function updateRole($attributes, $id)
     {
-        DB::beginTransaction();
-        try {
-            $collection = collect($attributes);
+        $collection = collect($attributes);
 
-            $role = $this->roleModel::find($id);
-            $role->update([
-                'name' => $collection['name'],
-                'slug' => Str::slug($collection['name']),
-            ]);
-            if (isset($collection['permissions']) && !empty($collection['permissions'])) {
-                DB::table('roles_permissions')
-                    ->where('role_id', $id)
-                    ->delete();
+        $role = $this->roleModel::find($id);
+        $role->update([
+            'name' => $collection['name'],
+            'slug' => Str::slug($collection['name']),
+        ]);
+        if (isset($collection['permissions']) && !empty($collection['permissions'])) {
+            DB::table('roles_permissions')
+                ->where('role_id', $id)
+                ->delete();
 
-                foreach ($collection['permissions'] as $key => $value) {
-                    $role_permission = DB::table('roles_permissions')->insert(
-                        [
-                            'role_id' => $id,
-                            'permission_id' => $value
-                        ]
-                    );
-                }
+            foreach ($collection['permissions'] as $key => $value) {
+                $role_permission = DB::table('roles_permissions')->insert(
+                    [
+                        'role_id' => $id,
+                        'permission_id' => $value
+                    ]
+                );
             }
-            if (isset($role_permission) && !empty($role_permission)) {
-                DB::commit();
-                return true;
-            } else {
-                return false;
-            }
-        } catch (Exception $e) {
-            DB::rollBack();
-            logger($e->getCode() . '->' . $e->getLine() . '->' . $e->getMessage());
+        }
+        if (isset($role_permission) && !empty($role_permission)) {
+            return true;
+        } else {
+            return false;
         }
     }
     /**
@@ -151,18 +137,25 @@ class RolePermissionRepository extends BaseRepository implements RolePermissionC
      */
     public function deleteRole($id)
     {
-        try {
-            if (isset($id) && !empty($id)) {
-                DB::table('roles_permissions')
-                    ->where('role_id', $id)
-                    ->delete();
-            }
-            Role::where('id', $id)->delete();
-            if (isset($result) && !empty($result)) {
-                return response()->json(['success' => true, 'msg' => 'Role deleted Successfully']);
-            }
-        } catch (Exception $e) {
-            logger($e->getCode() . '->' . $e->getLine() . '->' . $e->getMessage());
+        if (isset($id) && !empty($id)) {
+            DB::table('roles_permissions')
+                ->where('role_id', $id)
+                ->delete();
         }
+        Role::where('id', $id)->delete();
+        if (isset($result) && !empty($result)) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+    /**
+     * To delete a record
+     *
+     * @param array $id
+     */
+    public function getAdminRole()
+    {
+        return $this->roleModel::whereNot('slug', 'user')->get();
     }
 }

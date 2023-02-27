@@ -5,11 +5,11 @@ use App\Http\Controllers\Admin\{
     RolePermissionController
 };
 
+
+#Role Permission Related Routes
+Route::resource('roles', RolePermissionController::class);
 Route::controller(RolePermissionController::class)->group(function () {
-    Route::group(['prefix' => 'roles', 'as' => 'roles.'], function () {
-        Route::get('/', 'index')->name('index');
-        Route::post('store', 'store')->name('store');
-        Route::put('update', 'update')->name('update');
-        Route::delete('delete', 'delete')->name('delete');
+    Route::group(['prefix' => 'role', 'as' => 'roles.'], function () {
+        Route::get('assign', 'assignRole')->name('assignRole');
     });
 });

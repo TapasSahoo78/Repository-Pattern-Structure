@@ -77,4 +77,14 @@ class RolePermissionService
     {
         return $this->RolePermissionRepository->deleteRole($id);
     }
+
+    /**
+     * Find all role without user
+     *
+     * @param $id
+     */
+    public function getAdminRole()
+    {
+        return $this->RolePermissionRepository->getAdminRole();
+    }
 }

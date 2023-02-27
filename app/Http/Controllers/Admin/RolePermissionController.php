@@ -2,14 +2,19 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Http\Controllers\Controller;
+use App\Http\Controllers\BaseController;
 use App\Http\Requests\Admin\RolePermissionRequest;
 use App\Services\RolePermissionService;
 use Illuminate\Http\Request;
+use Exception;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 
-class RolePermissionController extends Controller
+class RolePermissionController extends BaseController
 {
     protected $RolePermissionService;
+    protected $status = false;
+    protected $message;
 
     public function __construct(RolePermissionService $RolePermissionService)
     {
@@ -23,7 +28,7 @@ class RolePermissionController extends Controller
     {
         $this->setPageTitle('Roles', '');
         $role_with_permission = $this->RolePermissionService->getRoleWithPermssion();
-        return view('', compact('role_with_permission'));
+        return view('roles.index', compact('role_with_permission'));
     }
 
     /**
@@ -33,7 +38,7 @@ class RolePermissionController extends Controller
     {
         $this->setPageTitle('Create Role', '');
         $permissions = $this->RolePermissionService->getAllPermissions();
-        return view('', compact('permissions'));
+        return view('roles.create', compact('permissions'));
     }
 
     /**
@@ -41,11 +46,19 @@ class RolePermissionController extends Controller
      */
     public function store(RolePermissionRequest $request)
     {
-        $store = $this->RolePermissionService->storeRoleWithPermssion($request);
-        if (isset($store) && !empty($store)) {
-            return $this->responseRedirectWithQueryString('user.list', ['name' => $request->name], $request->name . 'Added/Updated Successfully', 'success', false);
-        } else {
-            return $this->responseRedirectBack('We are facing some Technical issue at this moment', 'error', true, true);
+        DB::beginTransaction();
+        try {
+            $store = $this->RolePermissionService->storeRoleWithPermssion($request);
+
+            if (isset($store) && !empty($store)) {
+                DB::commit();
+                return redirect()->route('roles.index')->with('message', config('custom.MSG_RECORD_INSERT_SUCCESS'));
+            } else {
+                return $this->responseRedirectBack('We are facing some Technical issue at this moment', 'message', true, true);
+            }
+        } catch (Exception $e) {
+            DB::rollBack();
+            logger($e->getCode() . '->' . $e->getLine() . '->' . $e->getMessage());
         }
     }
 
@@ -54,9 +67,10 @@ class RolePermissionController extends Controller
      */
     public function edit(string $id)
     {
-        $all_permissions = $this->RolePermissionService->getAllPermissions();
-        $edit_role = $this->RolePermissionService->editRoleWithPermssion($id);
-        return view('', compact('all_permissions', 'edit_role'));
+        $edit_id = Crypt::decrypt($id);
+        $permissions = $this->RolePermissionService->getAllPermissions();
+        $edit_role = $this->RolePermissionService->editRoleWithPermssion($edit_id);
+        return view('roles.create', compact('permissions', 'edit_role'));
     }
 
     /**
@@ -64,12 +78,24 @@ class RolePermissionController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        $request->validate([
-            'name' => 'required|max:100|unique:roles,name,' . $id
-        ], [
-            'name.requried' => 'Please give a role name'
-        ]);
-        return $this->RolePermissionService->updateRoleWithPermssion($request, $id);
+        DB::beginTransaction();
+        try {
+            $request->validate([
+                'name' => 'required|max:100|unique:roles,name,' . $id
+            ], [
+                'name.requried' => 'Please give a role name'
+            ]);
+            $update = $this->RolePermissionService->updateRoleWithPermssion($request, $id);
+            if (isset($update) && !empty($update)) {
+                DB::commit();
+                return redirect()->route('roles.index')->with('message', config('custom.MSG_RECORD_UPDATE_SUCCESS'));
+            } else {
+                return $this->responseRedirectBack('We are facing some Technical issue at this moment', 'error', true, true);
+            }
+        } catch (Exception $e) {
+            DB::rollBack();
+            logger($e->getCode() . '->' . $e->getLine() . '->' . $e->getMessage());
+        }
     }
 
     /**
@@ -77,6 +103,31 @@ class RolePermissionController extends Controller
      */
     public function destroy(string $id)
     {
-        $this->RolePermissionService->deleteRoleWithPermssion($id);
+        $this->message = config('custom.MSG_ERROR_TRY_AGAIN');
+        try {
+            $delete = $this->RolePermissionService->deleteRoleWithPermssion($id);
+            if (isset($delete) && !empty($delete)) {
+                $this->status = true;
+                $this->message = config('custom.MSG_RECORD_DELETE_SUCCESS');
+            } else {
+                $this->status = false;
+                $this->message = config('custom.MSG_RECORD_DELETE_FAILED');
+            }
+        } catch (Exception $e) {
+            logger($e->getCode() . '->' . $e->getLine() . '->' . $e->getMessage());
+        }
+        return $this->responseJson($this->status, 200, $this->message);
+    }
+
+    /**
+     * Show the form for creating a new resource.
+     */
+    public function assignRole()
+    {
+        $this->setPageTitle('User Role', '');
+
+        $roles = $this->RolePermissionService->getAdminRole();
+        return $roles;
+        return view('admin.roles.role_with_user', compact('roles'));
     }
 }
